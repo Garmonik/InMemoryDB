@@ -1,6 +1,7 @@
 import configparser
 import logging
 from collections import defaultdict
+from typing import List
 
 config = configparser.ConfigParser()
 config.read('config.ini')
@@ -31,7 +32,7 @@ class InMemoryDB:
         self.logger = logging.getLogger("InMemoryDB")
 
     @property
-    def db_size(self):
+    def db_size(self) -> int:
         """
         The method returns the current size of the database
         (read-only)
@@ -39,14 +40,14 @@ class InMemoryDB:
         return len(self._main_db)
 
     @property
-    def transaction_depth(self):
+    def transaction_depth(self) -> int:
         """
         The method returns the current transaction depth
         (read-only)
         """
         return len(self._transaction_stack)
 
-    def _validate_key_value(self, key: str, value: str):
+    def _validate_key_value(self, key: str, value: str) -> None:
         """
         Method for validating input parameters
         """
@@ -55,13 +56,13 @@ class InMemoryDB:
         if not (isinstance(value, str) and value.isalnum()):
             raise ValueError("Value must be alphanumeric string")
 
-    def _validate_string(self, string: str):
+    def _validate_string(self, string: str) -> bool:
         """
         Method for validating key
         """
         return not isinstance(string, str) or not string.isalnum()
 
-    def set_value(self, key: str, value: str):
+    def set_value(self, key: str, value: str) -> None:
         """
         Method to set a value
         """
@@ -84,7 +85,7 @@ class InMemoryDB:
             self._update_main_db(key, value)
             self.logger.info(f"SET: {key} = {value}")
 
-    def _update_main_db(self, key: str, value: str):
+    def _update_main_db(self, key: str, value: str) -> None:
         """
         Method for updating the database
         """
@@ -97,7 +98,7 @@ class InMemoryDB:
         self._main_db[key] = value
         self._counts[value] += 1
 
-    def get_value(self, key: str):
+    def get_value(self, key: str) -> str:
         """
         Method to get value from database by key
         """
@@ -112,7 +113,7 @@ class InMemoryDB:
         self.logger.info(f"Successfully retrieved value by key: {key}")
         return self._main_db.get(key, "NULL")
 
-    def unset_value(self, key: str):
+    def unset_value(self, key: str) -> None:
         """
         Method to remove value with check
         """
@@ -134,7 +135,7 @@ class InMemoryDB:
                     del self._counts[value]
                 self.logger.info(f"UNSET in transaction: {key}")
 
-    def count_values(self, value: str):
+    def count_values(self, value: str) -> int | str:
         """
         Method for calculating values with verification
         """
@@ -156,7 +157,7 @@ class InMemoryDB:
                     count -= 1
         return count
 
-    def find_keys(self, value: str):
+    def find_keys(self, value: str) -> List[str] | str:
         """
         Method for finding keys with verification
         """
@@ -176,7 +177,7 @@ class InMemoryDB:
                     keys.remove(key)
         return sorted(keys) if keys else "NULL"
 
-    def begin_transaction(self):
+    def begin_transaction(self) -> None:
         """
         Method to start a transaction
         """
@@ -185,7 +186,7 @@ class InMemoryDB:
         self._transaction_stack.append({"updates": {}, "old_values": {}})
         self.logger.info("BEGIN TRANSACTION")
 
-    def rollback_transaction(self):
+    def rollback_transaction(self) -> bool:
         """
         Method for rolling back a transaction
         """
@@ -197,7 +198,7 @@ class InMemoryDB:
         self.logger.info("ROLLBACK TRANSACTION")
         return True
 
-    def commit_transaction(self):
+    def commit_transaction(self) -> bool:
         """
         Method to commit a transaction
         """
