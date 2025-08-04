@@ -156,7 +156,7 @@ class InMemoryDB:
                     count -= 1
         return count
 
-    def find_keys(self, value):
+    def find_keys(self, value: str):
         """
         Method for finding keys with verification
         """
