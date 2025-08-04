@@ -23,7 +23,7 @@ class InMemoryDB:
         self.__MAX_DB_SIZE = MAX_DB_SIZE
 
         logging.basicConfig(
-            filename='db_logs.log',
+            filename='db_logs.log.example',
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
