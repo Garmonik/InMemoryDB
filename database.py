@@ -62,12 +62,31 @@ class InMemoryDB:
         """
         return not isinstance(string, str) or not string.isalnum()
 
+    def _get_effective_db(self) -> dict[str, str]:
+        effective_db = dict(self._main_db)
+        for transaction in self._transaction_stack:
+            for key, value in transaction["updates"].items():
+                if value == "NULL":
+                    effective_db.pop(key, None)
+                else:
+                    effective_db[key] = value
+
+        return effective_db
+
+    def _key_with_value(self, value: str) -> List[str] | str:
+        if self._validate_string(value):
+            return "ERROR: Invalid value format"
+
+        effective_db = self._get_effective_db()
+        keys = [k for k, v in effective_db.items() if v == value]
+        return keys
+
     def set_value(self, key: str, value: str) -> None:
         """
         Method to set a value
         """
         self._validate_key_value(key, value)
-        if self.db_size >= self.__MAX_DB_SIZE and self._transaction_stack:
+        if self.db_size >= self.__MAX_DB_SIZE:
             self.logger.error("Database is full")
             raise MemoryError("Database size limit reached")
 
@@ -77,8 +96,8 @@ class InMemoryDB:
                 raise RecursionError("Maximum transaction depth reached")
 
             current_transaction = self._transaction_stack[-1]
-            if key not in current_transaction["old_values"] and key in self._main_db:
-                current_transaction["old_values"][key] = self._main_db[key]
+            if key not in current_transaction["old_values"]:
+                current_transaction["old_values"][key] = self._main_db.get(key)
             current_transaction["updates"][key] = value
             self.logger.info(f"SET in transaction: {key} = {value}")
         else:
@@ -122,8 +141,8 @@ class InMemoryDB:
 
         if self._transaction_stack:
             current_transaction = self._transaction_stack[-1]
-            if key not in current_transaction["old_values"] and key in self._main_db:
-                current_transaction["old_values"][key] = self._main_db[key]
+            if key not in current_transaction["old_values"]:
+                current_transaction["old_values"][key] = self._main_db.get(key)
             current_transaction["updates"][key] = "NULL"
             self.logger.info(f"UNSET in transaction: {key}")
         else:
@@ -133,49 +152,21 @@ class InMemoryDB:
                 self._counts[value] -= 1
                 if self._counts[value] == 0:
                     del self._counts[value]
-                self.logger.info(f"UNSET in transaction: {key}")
+                self.logger.info(f"UNSET: {key}")
 
     def count_values(self, value: str) -> int | str:
         """
         Method for calculating values with verification
         """
-        if self._validate_string(value):
-            return "ERROR: Invalid value format"
-
-        count = self._counts.get(value, 0)
-
-        for transaction in self._transaction_stack:
-            for key, val in transaction["updates"].items():
-                if key in self._main_db or any(t['updates'].get(key, "NULL") != "NULL"
-                                               for t in self._transaction_stack[:self._transaction_stack.index(transaction)]):
-                    old_values = transaction["old_values"].get(key, self._main_db[key])
-                    if old_values == value:
-                        count -= 1
-                if val == value:
-                    count += 1
-                elif val == "NULL" and transaction["old_values"].get(key) == value:
-                    count -= 1
-        return count
+        count_values = self._key_with_value(value)
+        return len(count_values) if isinstance(count_values, list) else count_values
 
     def find_keys(self, value: str) -> List[str] | str:
         """
         Method for finding keys with verification
         """
-        if self._validate_string(value):
-            return "ERROR: Invalid value format"
-
-        keys = set()
-        for key, val in self._main_db.items():
-            if val == value:
-                keys.add(key)
-
-        for transaction in self._transaction_stack:
-            for key, val in transaction["updates"].items():
-                if val == value:
-                    keys.add(key)
-                elif val == "NULL" and key in keys:
-                    keys.remove(key)
-        return sorted(keys) if keys else "NULL"
+        find_keys = self._key_with_value(value)
+        return sorted(find_keys) if isinstance(find_keys, list) and find_keys else "NULL"
 
     def begin_transaction(self) -> None:
         """
@@ -203,20 +194,25 @@ class InMemoryDB:
         Method to commit a transaction
         """
         if not self._transaction_stack:
-            self.logger.warning("ROLLBACK attempted with no active transactions")
+            self.logger.warning("COMMIT attempted with no active transactions")
             return False
 
-        while self._transaction_stack:
-            transaction = self._transaction_stack.pop(0)
+        transaction = self._transaction_stack.pop()
+        if self._transaction_stack:
+            parent_transaction = self._transaction_stack[-1]
             for key, value in transaction["updates"].items():
-                if value == "NULL":
-                    if key not in self._main_db:
-                        old_values = self._main_db[key]
-                        del self._main_db[key]
-                        self._counts[old_values] -= 1
-                        if self._counts[old_values] == 0:
-                            del self._counts[old_values]
+                if key not in parent_transaction["old_values"]:
+                    parent_transaction["old_values"][key] = self._main_db.get(key)
+                parent_transaction["updates"][key] = value
+        else:
+            for key, value in transaction["updates"].items():
+                if value == "NULL" and key in self._main_db:
+                    old_values = self._main_db[key]
+                    del self._main_db[key]
+                    self._counts[old_values] -= 1
+                    if self._counts[old_values] == 0:
+                        del self._counts[old_values]
                 else:
                     self._update_main_db(key, value)
-        self.logger.info("COMMIT ALL TRANSACTION")
+        self.logger.info("COMMIT TRANSACTION")
         return True
