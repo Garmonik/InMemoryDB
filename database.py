@@ -1,8 +1,9 @@
+import configparser
 import logging
 from collections import defaultdict
 
-MAX_TRANSACTION_DEPTH = 100
-MAX_DB_SIZE = 100000
+config = configparser.ConfigParser()
+config.read('config.ini')
 
 class InMemoryDB:
     def __init__(self):
@@ -19,11 +20,11 @@ class InMemoryDB:
         self._main_db = {}
         self._counts = defaultdict(int)
         self._transaction_stack = []
-        self.__MAX_TRANSACTION_DEPTH = MAX_TRANSACTION_DEPTH
-        self.__MAX_DB_SIZE = MAX_DB_SIZE
+        self.__MAX_TRANSACTION_DEPTH = config.getint('DEFAULT', 'MAX_TRANSACTION_DEPTH', fallback=100)
+        self.__MAX_DB_SIZE = config.getint('DEFAULT', 'MAX_DB_SIZE', fallback=100000)
 
         logging.basicConfig(
-            filename='db_logs.log.example',
+            filename=config.get('DEFAULT', 'LOG_FILE', fallback='db_logs'),
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
