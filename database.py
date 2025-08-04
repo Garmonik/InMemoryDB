@@ -25,7 +25,7 @@ class InMemoryDB:
         self.__MAX_DB_SIZE = config.getint('DEFAULT', 'MAX_DB_SIZE', fallback=100000)
 
         logging.basicConfig(
-            filename=config.get('DEFAULT', 'LOG_FILE', fallback='db_logs'),
+            filename=config.get('DEFAULT', 'LOG_FILE', fallback='db_logs.log'),
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
